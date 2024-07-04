@@ -1,0 +1,12 @@
+[package]
+name = "java-signatures"
+version = "0.1.0"
+edition = "2021"
+license = "0BSD"
+repository = "https://github.com/xitep/java-signatures.git"
+authors = ["Petr Novotnik <pnovotnik@googlemail.com>"]
+description = "java classfile signatures parser"
+exclude = [".gitignore", "tests/parse/**", "Cargo.lock"]
+
+[dev-dependencies]
+cafebabe = { version = "0.7" }
