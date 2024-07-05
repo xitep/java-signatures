@@ -1,5 +1,57 @@
-/// Validates/Parses Java Type Signatures according to the syntax specified by:
-/// https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.7.9.1
+//! Validates/Parses Java Type Signatures according to the syntax
+//! specified by the [JVM speicification](https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.7.9.1).
+//!
+//! This crate does _not_ attempt to parse entire java classfiles.
+//! Instead, it focuses merely on parsing signature strings located as
+//! attributes in classfiles.  For parse classfiles themselves we do
+//! already have a number of very nice crates on
+//! [crates.io.](https://crates.io/search?q=%23classfile%20%23java)
+//! Only some of them do parse the signature string and provide a
+//! model over them.  This crate is supposed to supplement those
+//! classfile parsers which reveal the signatures as pure strings.
+//!
+//! The signature parsers provided by this create are strinct in the
+//! sense thaat the entirely input string must be matched according to
+//! the syntax rules. Leaing (whitespace) to trailing characters are
+//! not tolerated.
+//!
+//! Example:
+//! ```rust
+//! // ~ a signature corresponding to a `class Bar<T extends Serializable & Comparable<T>> {..}`
+//! // ~ to be obtained from a classfile using a corresponding parser, for example `cafebabe`
+//! let s = "<T::Ljava/io/Serializable;:Ljava/lang/Comparable<TT;>;>Ljava/lang/Object;";
+//! match parse_class_signature(s) {
+//!     Ok(parsed) => {
+//!         // ~ access to the individual parts of the signature
+//!         assert_eq!(1, parsed.type_params.len());
+//!         assert_eq!("T", parsed.type_params[0].name);
+//!         assert!(parsed.type_params[0].class_bound.is_none());
+//!         assert_eq!(2, parsed.type_params[0].iface_bounds.len());
+//!         assert!(matches!(
+//!             &parsed.type_params[0].iface_bounds[0],
+//!             ReferenceType::Class(ClassType {
+//!                 base: SimpleClassType {
+//!                     name: "java/io/Serializable",
+//!                     ..
+//!                 },
+//!                 ..
+//!             })
+//!         ));
+//!         // ...
+//!
+//!         // ~ the `Display` implementation of the parsed
+//!         // signature will produce the original signature
+//!         // string again
+//!         assert_eq!(s, format!("{parsed}"));
+//!     }
+//!     Err(e) => {
+//!         eprintln!("invalid class signature:");
+//!         eprintln!("> {}", e.signature());
+//!         eprintln!("> {}^-- {e}", " ".repeat(e.position()));
+//!     }
+//! }
+//! ```
+
 mod display;
 mod internal;
 
@@ -11,7 +63,8 @@ use std::fmt::Display;
 /// type of a field, formal parameter, local variable, or record
 /// component declaration.
 ///
-/// See: https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.7.9.1-610
+/// See the [specification](https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.7.9.1-610) for details.
+#[derive(Debug)]
 pub struct FieldSignature<'a>(pub ReferenceType<'a>);
 
 /// A parse class signature; encodes type information about a
@@ -21,7 +74,7 @@ pub struct FieldSignature<'a>(pub ReferenceType<'a>);
 /// superinterfaces, if any. A type parameter is described by its
 /// name, followed by any class bound and interface bounds.
 ///
-/// See: https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.7.9.1-410
+/// See the [specification](https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.7.9.1-410) for details.
 #[derive(Debug)]
 pub struct ClassSignature<'a> {
     pub type_params: Vec<TypeParameter<'a>>,
@@ -36,7 +89,7 @@ pub struct ClassSignature<'a> {
 /// if any; and the types of any exceptions declared in the method's
 /// throws clause.
 ///
-/// https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.7.9.1-510
+/// See the [specification](https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.7.9.1-510) for details.
 pub struct MethodSignature<'a> {
     pub type_params: Vec<TypeParameter<'a>>,
     pub parameters: Vec<JavaType<'a>>,
@@ -44,10 +97,10 @@ pub struct MethodSignature<'a> {
     pub throws: Vec<ThrowsType<'a>>,
 }
 
-/// a primitive type
+/// Represents a primitive java type.
 pub use internal::BaseType;
 
-/// a primitive or reference type
+/// Represents a primitive or reference type.
 #[derive(Debug)]
 pub enum JavaType<'a> {
     Base(BaseType),
@@ -65,6 +118,7 @@ impl<'a> JavaType<'a> {
     }
 }
 
+/// Represents type variables in argument position, e.g. as part of method parameters.
 #[derive(Debug)]
 pub enum TypeArgument<'a> {
     /// *; `<?>`
@@ -77,6 +131,7 @@ pub enum TypeArgument<'a> {
     Super(ReferenceType<'a>),
 }
 
+/// Represents a simple (ie. not nested) and possibly type-parametrized class type.
 #[derive(Debug)]
 pub struct SimpleClassType<'a> {
     pub name: &'a str,
@@ -107,24 +162,29 @@ impl<'a> SimpleClassType<'a> {
     }
 }
 
-/// Represents (a possibly nested) class type reference.  `base +
-/// nesting` together denote the ultimate path of the described class.
-/// This is, the last element of the concatenation of `base` and `nesting`
-/// denotes the simple name of the described class.
+/// Represents (a possibly nested, and possible type-parameterized)
+/// class type.
 ///
-/// `base` alone represents the top-leve class, while `nesting`
+/// `base + nesting` together denote the ultimate path of the
+/// described class.  This is, the concatenation of `base` and
+/// `nesting` represents the fully qualified class name with generic
+/// type information interspresed where necessary.  Put another way,
+/// the last element of this concatenation denotes the simple name of
+/// the described class.
+///
+/// `base` alone represents the top-level class, while `nesting`
 /// denotes the recursive nesting within it.
 #[derive(Debug)]
 pub struct ClassType<'a> {
     pub base: SimpleClassType<'a>,
-    pub nesting: Vec<SimpleClassType<'a>>,
+    pub nested: Vec<SimpleClassType<'a>>,
 }
 
 impl<'a> ClassType<'a> {
     fn from_internal(s: &'a str, internal: internal::ClassType) -> Self {
         Self {
             base: SimpleClassType::from_internal(s, internal.0),
-            nesting: internal
+            nested: internal
                 .1
                 .into_iter()
                 .map(|ty| SimpleClassType::from_internal(s, ty))
@@ -133,34 +193,49 @@ impl<'a> ClassType<'a> {
     }
 }
 
+/// Represents an array type.
+#[derive(Debug)]
+pub struct ArrayType<'a> {
+    /// The dimention of the array. Always greater zero, by definition.
+    pub dimension: usize,
+    /// The type of the elements in the array.
+    pub ty: JavaType<'a>,
+}
+
+/// Represents a reference type, ie. a class, an array, or a type variable.
 #[derive(Debug)]
 pub enum ReferenceType<'a> {
-    /// a class type, potential nesting split up by class level nesting
-    ClassType(ClassType<'a>),
+    /// a class type
+    Class(ClassType<'a>),
     /// a type variable
-    TypeVariable(&'a str),
+    Variable(&'a str),
     /// an array type
-    ArrayType {
-        dimension: usize,
-        ty: Box<JavaType<'a>>,
-    },
+    Array(Box<ArrayType<'a>>),
 }
 
 impl<'a> ReferenceType<'a> {
     fn from_internal(s: &'a str, internal: internal::ReferenceType) -> Self {
         match internal {
-            internal::ReferenceType::ClassType(ty) => {
-                ReferenceType::ClassType(ClassType::from_internal(s, ty))
+            internal::ReferenceType::Class(ty) => {
+                ReferenceType::Class(ClassType::from_internal(s, ty))
             }
-            internal::ReferenceType::TypeVariable(r) => ReferenceType::TypeVariable(r.apply(s)),
-            internal::ReferenceType::ArrayType { dimension, ty } => ReferenceType::ArrayType {
-                dimension,
-                ty: Box::new(JavaType::from_internal(s, *ty)),
-            },
+            internal::ReferenceType::Variable(r) => ReferenceType::Variable(r.apply(s)),
+            internal::ReferenceType::Array { dimension, ty } => {
+                ReferenceType::Array(Box::new(ArrayType {
+                    dimension,
+                    ty: JavaType::from_internal(s, *ty),
+                }))
+            }
         }
     }
 }
 
+/// Represents type variables in declaration position, e.g. as part of
+/// a class or method declaration which introduces variable types.
+///
+/// Examples of type parameters `X, Y, Z`:
+/// - `class Foo<X, Y, Z> {...}`
+/// - `<X, Y, Z> void foo(...) { ... }`
 #[derive(Debug)]
 pub struct TypeParameter<'a> {
     pub name: &'a str,
@@ -184,6 +259,7 @@ impl<'a> TypeParameter<'a> {
     }
 }
 
+/// Represents the type in method return position.
 pub enum ResultType<'a> {
     VoidType,
     ValueType(JavaType<'a>),
@@ -200,6 +276,7 @@ impl<'a> ResultType<'a> {
     }
 }
 
+/// Represents (exception) types in method "throws" declaration position.
 pub enum ThrowsType<'a> {
     ClassType(ClassType<'a>),
     TypeVariable(&'a str),
@@ -218,6 +295,9 @@ impl<'a> ThrowsType<'a> {
 
 // --------------------------------------------------------------------
 
+/// Error signaling a signature parse failure. The error references
+/// the originally parsed string providing convenience methods to
+/// inspect where the error occurred.
 #[derive(Debug)]
 pub struct ParseError<'a> {
     signature: &'a str,
@@ -276,6 +356,7 @@ impl<'a> ParseError<'a> {
     }
 }
 
+/// An alias for `std::result::Result<T, ParseError>`
 pub type Result<'a, T> = std::result::Result<T, ParseError<'a>>;
 
 // --------------------------------------------------------------------
@@ -325,10 +406,14 @@ pub fn parse_class_signature(s: &str) -> Result<ClassSignature<'_>> {
     .map_err(|e| ParseError::new(s, e))
 }
 
+/// Convenience method to parse the given string as a [class
+/// signature](ClassSignature) returning `true` upon success, `false`
+/// otherwise.
 pub fn is_class_signature(s: &str) -> bool {
     parse_class_signature(s).is_ok()
 }
 
+/// Attempts to parse the given string as a [method signature.](MethodSignature)
 pub fn parse_method_signature(s: &str) -> Result<MethodSignature<'_>> {
     internal::parse(
         "MethodSignature",
@@ -357,6 +442,9 @@ pub fn parse_method_signature(s: &str) -> Result<MethodSignature<'_>> {
     .map_err(|e| ParseError::new(s, e))
 }
 
+/// Convenience method to parse the given string as a
+/// [method signature](MethodSignature) returning `true`
+/// upon success, `false` otherwise.
 pub fn is_method_signature(s: &str) -> bool {
     parse_method_signature(s).is_ok()
 }

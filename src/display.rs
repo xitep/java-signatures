@@ -56,13 +56,13 @@ fn render_reference_type(
     f: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
     match ty {
-        ReferenceType::ClassType(ty) => render_class_type(ty, f),
-        ReferenceType::TypeVariable(name) => render_type_variable(name, f),
-        ReferenceType::ArrayType { dimension, ref ty } => {
-            for _ in 0..*dimension {
+        ReferenceType::Class(ty) => render_class_type(ty, f),
+        ReferenceType::Variable(name) => render_type_variable(name, f),
+        ReferenceType::Array(arr) => {
+            for _ in 0..arr.dimension {
                 f.write_char('[')?;
             }
-            render_java_type(ty, f)
+            render_java_type(&arr.ty, f)
         }
     }
 }
@@ -70,7 +70,7 @@ fn render_reference_type(
 fn render_class_type(ty: &ClassType<'_>, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.write_char('L')?;
     render_simple_class_type(&ty.base, f)?;
-    for ty in &ty.nesting {
+    for ty in &ty.nested {
         f.write_char('.')?;
         render_simple_class_type(ty, f)?;
     }

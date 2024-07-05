@@ -6,6 +6,7 @@ license = "0BSD"
 repository = "https://github.com/xitep/java-signatures.git"
 authors = ["Petr Novotnik <pnovotnik@googlemail.com>"]
 description = "java classfile signatures parser"
+keywords = ["parser", "java", "jvm", "class", "classfile"]
 exclude = [".gitignore", "tests/parse/**", "Cargo.lock"]
 
 [dev-dependencies]

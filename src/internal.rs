@@ -76,9 +76,9 @@ pub struct ClassType(pub SimpleClassType, pub Vec<SimpleClassType>);
 
 #[derive(Debug)]
 pub enum ReferenceType {
-    ClassType(ClassType),
-    TypeVariable(Slice),
-    ArrayType { dimension: usize, ty: Box<JavaType> },
+    Class(ClassType),
+    Variable(Slice),
+    Array { dimension: usize, ty: Box<JavaType> },
 }
 
 #[derive(Debug)]
@@ -278,7 +278,7 @@ fn consume_reference_type_signature_(
         if dimension == 0 {
             ty
         } else {
-            ReferenceType::ArrayType {
+            ReferenceType::Array {
                 dimension,
                 ty: Box::new(JavaType::Reference(ty)),
             }
@@ -299,7 +299,7 @@ fn consume_reference_type_signature_(
                 match to_base_type(next.1) {
                     Some(ty) => {
                         debug_assert!(dimension > 0);
-                        return dbg!(Ok(ReferenceType::ArrayType {
+                        return dbg!(Ok(ReferenceType::Array {
                             dimension,
                             ty: Box::new(JavaType::Base(ty)),
                         }));
@@ -312,16 +312,14 @@ fn consume_reference_type_signature_(
             'L' => {
                 // ClassTypeSignature
                 return consume_class_type_signature(more_chars)
-                    .map(|ty| maybe_as_array(dimension, ReferenceType::ClassType(ty)));
+                    .map(|ty| maybe_as_array(dimension, ReferenceType::Class(ty)));
             }
             'T' => {
                 // TypeVariableSignature
                 let r = consume_unqualified_identifer(more_chars)?;
                 return match r.1 {
                     None => Err(ParseError::eof("ReferenceTypeSignature")),
-                    Some((_, ';')) => {
-                        Ok(maybe_as_array(dimension, ReferenceType::TypeVariable(r.0)))
-                    }
+                    Some((_, ';')) => Ok(maybe_as_array(dimension, ReferenceType::Variable(r.0))),
                     Some((pos, _)) => Err(ParseError::new(
                         "ReferenceTypeSignature",
                         pos,
@@ -740,7 +738,7 @@ mod tests {
         assert_eq!(2, r.parameters.len());
         assert!(matches!(
             r.parameters[0],
-            JavaType::Reference(ReferenceType::ArrayType {
+            JavaType::Reference(ReferenceType::Array {
                 dimension: 1,
                 ty: _
             })
