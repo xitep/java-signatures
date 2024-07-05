@@ -26,7 +26,7 @@ performance yet, though.
 Apart of the embedded unit tests, `test/parse.rs` will pick up any
 `.class` file below `test/parse/**`, extract their class / method /
 field signature strings using
-`[cafebabe](https://github.com/staktrace/cafebabe)`, parse them using
+[`cafebabe`](https://github.com/staktrace/cafebabe), parse them using
 `java-signatures` and validate that the parsed signatures correctly
 serialize back to their original form.  To keep the repository small,
 we do not host any class files there permanently.
