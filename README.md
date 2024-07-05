@@ -1,3 +1,6 @@
+[![crates.io](https://img.shields.io/crates/v/java-signatures.svg)](https://crates.io/crates/java-signatures)
+[![docs.rs](https://docs.rs/java-signatures/badge.svg)](https://docs.rs/java-signatures)
+
 ## java-signatures
 
 A parser for Java's class / method / field signatures as described by
