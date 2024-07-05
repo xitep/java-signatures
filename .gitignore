@@ -1,3 +1,4 @@
 /target
-/tests/parse/
+/tests/parse/*
+!/tests/parse/.gitkeep
 /Cargo.lock
