@@ -8,19 +8,39 @@ to parse Java's classfiles and give access to the signatures, albeit,
 merely as raw strings.  This small library attempts to fill the gap.
 
 ## example
-```
-        let s = "<K:Ljava/lang/Object;V:Ljava/lang/Object;>Ljava/lang/Object;";
-        match parse_class_signature(s) {
-            Ok(parsed) => {
-                assert_eq!("K", parsed.type_params[0].name);
-                // ...
-            }
-            Err(e) => {
-                eprintln!("invalid class signature:");
-                eprintln!("> {}", e.signature());
-                eprintln!("> {}^-- {e}", " ".repeat(e.position()));
-            }
-        }
+```rust
+// ~ a signature corresponding to a `class Bar<T extends Serializable & Comparable<T>> {..}`
+let s = "<T::Ljava/io/Serializable;:Ljava/lang/Comparable<TT;>;>Ljava/lang/Object;";
+match parse_class_signature(s) {
+    Ok(parsed) => {
+        // ~ access to the individual parts of the signature
+        assert_eq!(1, parsed.type_params.len());
+        assert_eq!("T", parsed.type_params[0].name);
+        assert!(parsed.type_params[0].class_bound.is_none());
+        assert_eq!(2, parsed.type_params[0].iface_bounds.len());
+        assert!(matches!(
+            &parsed.type_params[0].iface_bounds[0],
+            ReferenceType::ClassType(ClassType {
+                base: SimpleClassType {
+                    name: "java/io/Serializable",
+                    ..
+                },
+                ..
+            })
+        ));
+        // ...
+
+        // ~ the `Display` implementation of the parsed
+        // signature will produce the original signature
+        // string again
+        assert_eq!(s, format!("{parsed}"));
+    }
+    Err(e) => {
+        eprintln!("invalid class signature:");
+        eprintln!("> {}", e.signature());
+        eprintln!("> {}^-- {e}", " ".repeat(e.position()));
+    }
+}
 ```
 
 ## status
@@ -30,5 +50,5 @@ yields the same string.
 
 At this stage, the library does the right thing at providing
 structured access to the encoded signature data.  While avoiding
-copies of the parsed string, no focused effort has been spend on
-performance (yet.)
+copies of the parsed string, no focused effort has been spent on
+performance yet, though.

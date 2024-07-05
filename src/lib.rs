@@ -22,6 +22,7 @@ pub struct FieldSignature<'a>(pub ReferenceType<'a>);
 /// name, followed by any class bound and interface bounds.
 ///
 /// See: https://docs.oracle.com/javase/specs/jvms/se21/html/jvms-4.html#jvms-4.7.9.1-410
+#[derive(Debug)]
 pub struct ClassSignature<'a> {
     pub type_params: Vec<TypeParameter<'a>>,
     pub super_class: ClassType<'a>,
@@ -47,6 +48,7 @@ pub struct MethodSignature<'a> {
 pub use internal::BaseType;
 
 /// a primitive or reference type
+#[derive(Debug)]
 pub enum JavaType<'a> {
     Base(BaseType),
     Reference(ReferenceType<'a>),
@@ -63,6 +65,7 @@ impl<'a> JavaType<'a> {
     }
 }
 
+#[derive(Debug)]
 pub enum TypeArgument<'a> {
     /// *; `<?>`
     Unbounded,
@@ -74,6 +77,7 @@ pub enum TypeArgument<'a> {
     Super(ReferenceType<'a>),
 }
 
+#[derive(Debug)]
 pub struct SimpleClassType<'a> {
     pub name: &'a str,
     pub type_args: Vec<TypeArgument<'a>>,
@@ -110,6 +114,7 @@ impl<'a> SimpleClassType<'a> {
 ///
 /// `base` alone represents the top-leve class, while `nesting`
 /// denotes the recursive nesting within it.
+#[derive(Debug)]
 pub struct ClassType<'a> {
     pub base: SimpleClassType<'a>,
     pub nesting: Vec<SimpleClassType<'a>>,
@@ -128,6 +133,7 @@ impl<'a> ClassType<'a> {
     }
 }
 
+#[derive(Debug)]
 pub enum ReferenceType<'a> {
     /// a class type, potential nesting split up by class level nesting
     ClassType(ClassType<'a>),
@@ -155,6 +161,7 @@ impl<'a> ReferenceType<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct TypeParameter<'a> {
     pub name: &'a str,
     pub class_bound: Option<ReferenceType<'a>>,
