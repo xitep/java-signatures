@@ -17,6 +17,8 @@
 //!
 //! Example:
 //! ```rust
+//! use java_signatures::{parse_class_signature, ReferenceType, ClassType, SimpleClassType};
+//!
 //! // ~ a signature corresponding to a `class Bar<T extends Serializable & Comparable<T>> {..}`
 //! // ~ to be obtained from a classfile using a corresponding parser, for example `cafebabe`
 //! let s = "<T::Ljava/io/Serializable;:Ljava/lang/Comparable<TT;>;>Ljava/lang/Object;";
